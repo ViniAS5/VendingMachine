@@ -13,8 +13,11 @@ module servo_controller (
     parameter TIME_1_SEC  = 50000000;
     parameter TIME_2_SEC  = 100000000;
     
-    // Tempo de espera de 10 milissegundos (500.000 pulsos de clock)
+    // Tempo de espera de 10 milissegundos (500.000 pulsos)
     parameter TIME_SETTLE = 500000; 
+
+    // Tempo da trava de inicialização: 3 segundos (150.000.000 pulsos)
+    parameter TIME_BOOT_DELAY = 150000000;
 
     // Registradores
     reg [19:0] pwm_counter = 0;
@@ -26,6 +29,10 @@ module servo_controller (
     // Registradores pra delay
     reg waiting_cmd = 0;
     reg [19:0] settle_timer = 0;
+    
+    // Registradores para a Trava de Boot
+    reg [27:0] boot_timer = 0;
+    reg boot_done = 0;
 
     // Gerador da freq do pwm (50Hz)
     always @(posedge clk_50mhz) begin
@@ -39,41 +46,59 @@ module servo_controller (
     // Controlador da sequência de movimentos
     always @(posedge clk_50mhz) begin
         
-        // Pra estabilizar o sinal
-        if (cmd_in != 2'b00 && !is_running && !waiting_cmd) begin
-            waiting_cmd <= 1;   // Inicia a contagem de espera
-            settle_timer <= 0;
-        end
-
-        // Timer antes de ler o esp
-        if (waiting_cmd) begin
-            settle_timer <= settle_timer + 1;
-            if (settle_timer > TIME_SETTLE) begin
-                is_running <= 1;
-                routine_timer <= 0;
-                latched_cmd <= cmd_in; // AGORA SIM! Tira a foto com o sinal estável (11)
-                waiting_cmd <= 0;
-            end
-        end
-
-        // Rotina dos motores
-        if (is_running) begin
-            routine_timer <= routine_timer + 1;
+        // Logica da trava enquanto o esp inicia
+        if (!boot_done) begin
+            // Força a máquina a ficar parada no meio e limpa os comandos
+            active_pulse <= PULSE_1_5MS;
+            latched_cmd <= 2'b00;
+            is_running <= 0;
+            waiting_cmd <= 0;
             
-            if (routine_timer < TIME_1_SEC) begin
-                active_pulse <= PULSE_0_8MS;  // solta latinha
-            end 
-            else if (routine_timer < TIME_2_SEC) begin
-                active_pulse <= PULSE_2_5MS;  // pega latinha
-            end 
-            else begin
-                is_running <= 0;
-                routine_timer <= 0;
-                active_pulse <= PULSE_1_5MS;  // volta pro meio
-                latched_cmd <= 2'b00;         // limpa a memória
+            // Conta até 3 segundos
+            boot_timer <= boot_timer + 1;
+            if (boot_timer >= TIME_BOOT_DELAY) begin
+                boot_done <= 1; // Libera o funcionamento da máquina
             end
-        end else if (!waiting_cmd) begin
-            active_pulse <= PULSE_1_5MS;      // fica no meio
+        end 
+        
+        // Voltando a operar normalmente
+        else begin
+            // Pra estabilizar o sinal
+            if (cmd_in != 2'b00 && !is_running && !waiting_cmd) begin
+                waiting_cmd <= 1;   // Inicia a contagem de espera
+                settle_timer <= 0;
+            end
+
+            // Timer antes de ler o esp
+            if (waiting_cmd) begin
+                settle_timer <= settle_timer + 1;
+                if (settle_timer > TIME_SETTLE) begin
+                    is_running <= 1;
+                    routine_timer <= 0;
+                    latched_cmd <= cmd_in; 
+                    waiting_cmd <= 0;
+                end
+            end
+
+            // Rotina dos motores
+            if (is_running) begin
+                routine_timer <= routine_timer + 1;
+                
+                if (routine_timer < TIME_1_SEC) begin
+                    active_pulse <= PULSE_0_8MS;  // solta latinha
+                end 
+                else if (routine_timer < TIME_2_SEC) begin
+                    active_pulse <= PULSE_2_5MS;  // pega latinha
+                end 
+                else begin
+                    is_running <= 0;
+                    routine_timer <= 0;
+                    active_pulse <= PULSE_1_5MS;  // volta pro meio
+                    latched_cmd <= 2'b00;         // limpa a memória
+                end
+            end else if (!waiting_cmd) begin
+                active_pulse <= PULSE_1_5MS;      // fica no meio
+            end
         end
     end
 
