@@ -30,7 +30,7 @@ A comunicação entre o ESP32 e a FPGA é feita por um protocolo paralelo de 2 f
 | Componente de Origem | Pino / Porta | Destino | Função |
 | :--- | :--- | :--- | :--- |
 | **ESP32 (CYD)** | Pino 27 | FPGA (IO4) | Envio do Bit mais significativo (MSB) |
-| **ESP32 (CYD)** | Pino 22 | FPGA (IO2) | Envio do Bit menos significativo (LSB) |
+| **ESP32 (CYD)** | Pino 22 | FPGA (IO3) | Envio do Bit menos significativo (LSB) |
 | **FPGA** | IO6 | Servo 1 | Sinal PWM - Libera Coca-Cola |
 | **FPGA** | IO5 | Servo 2 | Sinal PWM - Libera Guaraná |
 | **FPGA** | IO9 | Servo 3 | Sinal PWM - Libera Sprite |
